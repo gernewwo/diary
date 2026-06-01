@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="일기장">
+<title>손글씨 일기장</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{--bg:#fdf8f2;--surface:#fff9f0;--accent:#c17b4a;--text:#3d2b1f;--muted:#9b7b65;--border:#e8d5c0;}
+body{font-family:'Apple SD Gothic Neo',-apple-system,sans-serif;background:var(--bg);color:var(--text);height:100dvh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* ── CALENDAR ── */
+#cal-view{display:flex;flex-direction:column;height:100dvh;}
+.cal-header{padding:16px 20px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:var(--surface);}
+.cal-title{font-size:22px;font-weight:700;}
+.cal-nav{display:flex;gap:6px;}
+.nav-btn{width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:transparent;font-size:18px;cursor:pointer;color:var(--accent);display:flex;align-items:center;justify-content:center;}
+.nav-btn:active{background:var(--border);}
+.dow-row{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 8px 2px;text-align:center;font-size:12px;color:var(--muted);font-weight:600;}
+.days-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:3px 8px 12px;flex:1;}
+.day-cell{border-radius:10px;display:flex;flex-direction:column;align-items:center;padding-top:4px;cursor:pointer;border:1.5px solid transparent;overflow:hidden;}
+.day-cell:active{background:var(--border);}
+.day-num{font-size:13px;font-weight:500;flex-shrink:0;}
+.day-cell.empty{pointer-events:none;opacity:0;}
+.day-cell.today{border-color:var(--accent);background:#fff5ec;}
+.day-cell.today .day-num{color:var(--accent);font-weight:700;}
+.day-cell.sun .day-num{color:#c0392b;}
+.day-cell.sat .day-num{color:#2980b9;}
+.day-thumb{width:100%;flex:1;object-fit:cover;border-radius:0 0 8px 8px;margin-top:2px;min-height:0;display:block;}
+.day-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);margin-top:3px;flex-shrink:0;}
+
+/* ── DIARY ── */
+#diary-view{display:none;flex-direction:column;height:100dvh;}
+
+/* single toolbar */
+.diary-bar{
+  display:flex;align-items:center;gap:0;
+  height:48px;flex-shrink:0;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 8px;overflow:hidden;
+}
+.bar-back{width:38px;height:38px;border-radius:50%;border:none;background:transparent;font-size:20px;cursor:pointer;color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.bar-date{font-size:14px;font-weight:700;padding:0 8px;flex-shrink:0;white-space:nowrap;}
+.bar-sep{width:1px;height:22px;background:var(--border);flex-shrink:0;margin:0 4px;}
+
+/* icon buttons in toolbar */
+.bar-btn{width:38px;height:38px;border-radius:10px;border:none;background:transparent;cursor:pointer;color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex-shrink:0;position:relative;}
+.bar-btn:active{background:var(--border);}
+.bar-btn.active{background:#f0e0d0;color:var(--accent);}
+.bar-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.bar-btn .lbl{font-size:9px;font-weight:600;line-height:1;}
+.bar-spacer{flex:1;}
+
+/* sub-panel: slides in below toolbar */
+.sub-panel{
+  display:none;flex-shrink:0;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:6px 10px;align-items:center;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+}
+.sub-panel.open{display:flex;}
+
+/* pen options */
+.pen-chip{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:16px;border:1.5px solid var(--border);background:transparent;cursor:pointer;flex-shrink:0;font-size:13px;color:var(--text);}
+.pen-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pen-chip svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+
+/* color dots */
+.cdot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:transform .1s;}
+.cdot.sel{border-color:var(--text);transform:scale(1.25);}
+.sz-slider{width:70px;flex-shrink:0;accent-color:var(--accent);}
+
+/* background options with color */
+.bg-section{display:flex;flex-direction:column;gap:6px;padding:8px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.bg-section.open{display:flex;}
+.bg-section{display:none;}
+.bg-row-label{font-size:11px;font-weight:600;color:var(--muted);}
+.bg-chips{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+.bg-chip{padding:5px 14px;border-radius:14px;border:1.5px solid var(--border);background:transparent;font-size:13px;cursor:pointer;color:var(--text);flex-shrink:0;white-space:nowrap;}
+.bg-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.bg-color-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}
+.bg-color-swatch{width:28px;height:28px;border-radius:8px;cursor:pointer;border:2px solid transparent;flex-shrink:0;}
+.bg-color-swatch.sel{border-color:var(--text);}
+
+/* text tool panel */
+.txt-panel{display:none;flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);padding:6px 10px;align-items:center;gap:8px;overflow-x:auto;}
+.txt-panel.open{display:flex;}
+.txt-size-btn{width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:transparent;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;}
+select.font-sel{height:28px;border-radius:8px;border:1.5px solid var(--border);background:transparent;font-size:13px;padding:0 6px;cursor:pointer;color:var(--text);}
+
+/* canvas */
+.canvas-wrap{flex:1;position:relative;overflow:hidden;}
+#draw-canvas{position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none;cursor:crosshair;}
+#overlay-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+
+/* text boxes */
+.txt-box{position:absolute;pointer-events:all;touch-action:none;min-width:80px;min-height:28px;}
+.txt-box textarea{width:100%;height:100%;background:transparent;border:1.5px dashed rgba(193,123,74,.5);border-radius:4px;resize:none;font-family:'Apple SD Gothic Neo',-apple-system,sans-serif;color:inherit;outline:none;padding:4px 6px;line-height:1.5;}
+.txt-box textarea:focus{border-color:var(--accent);}
+.txt-box-handle{position:absolute;bottom:-6px;right:-6px;width:14px;height:14px;background:var(--accent);border-radius:50%;cursor:se-resize;touch-action:none;border:2px solid #fff;}
+
+/* sticker / photo items */
+.placed-item{position:absolute;cursor:grab;user-select:none;pointer-events:all;touch-action:none;}
+.placed-item:active{cursor:grabbing;}
+.resize-handle{position:absolute;bottom:-7px;right:-7px;width:16px;height:16px;background:var(--accent);border-radius:50%;cursor:se-resize;touch-action:none;border:2px solid #fff;}
+
+/* sticker picker overlay */
+.picker-overlay{display:none;position:absolute;bottom:0;left:0;right:0;background:var(--surface);border-top:2px solid var(--border);padding:12px 14px 28px;z-index:20;max-height:45%;overflow-y:auto;}
+.picker-overlay.open{display:block;}
+.picker-title{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;}
+.s-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;}
+.s-item{font-size:28px;text-align:center;cursor:pointer;border-radius:8px;padding:2px;line-height:1.4;}
+.s-item:active{background:var(--border);}
+
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:10px 22px;border-radius:22px;font-size:14px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:99;}
+.toast.show{opacity:1;}
+
+/* bg pattern classes */
+.bgp-plain{background:#fffef8 !important;}
+.bgp-lined{background:repeating-linear-gradient(transparent,transparent 35px,rgba(0,0,0,.08) 35px,rgba(0,0,0,.08) 36px) !important;}
+.bgp-grid{background:repeating-linear-gradient(rgba(0,0,0,.06) 0,rgba(0,0,0,.06) 1px,transparent 1px,transparent 36px),repeating-linear-gradient(90deg,rgba(0,0,0,.06) 0,rgba(0,0,0,.06) 1px,transparent 1px,transparent 36px) !important;}
+.bgp-dot{background-image:radial-gradient(circle,rgba(0,0,0,.15) 1px,transparent 1px) !important;background-size:22px 22px !important;}
+</style>
+</head>
+<body>
+
+<!-- CALENDAR -->
+<div id="cal-view">
+  <div class="cal-header">
+    <div class="cal-title" id="cal-title"></div>
+    <div class="cal-nav">
+      <button class="nav-btn" onclick="changeMonth(-1)">‹</button>
+      <button class="nav-btn" onclick="changeMonth(1)">›</button>
+    </div>
+  </div>
+  <div class="dow-row">
+    <div style="color:#c0392b">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div style="color:#2980b9">토</div>
+  </div>
+  <div class="days-grid" id="days-grid"></div>
+</div>
+
+<!-- DIARY -->
+<div id="diary-view">
+
+  <!-- SINGLE TOOLBAR -->
+  <div class="diary-bar">
+    <button class="bar-back" onclick="goBack()">←</button>
+    <div class="bar-date" id="bar-date"></div>
+    <div class="bar-sep"></div>
+
+    <!-- 그리기 -->
+    <button class="bar-btn active" id="btn-draw" onclick="activateTool('draw')" title="그리기">
+      <svg viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+      <span class="lbl">그리기</span>
+    </button>
+
+    <!-- 텍스트 -->
+    <button class="bar-btn" id="btn-text" onclick="activateTool('text')" title="타이핑">
+      <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+      <span class="lbl">타이핑</span>
+    </button>
+
+    <!-- 지우개 -->
+    <button class="bar-btn" id="btn-erase" onclick="activateTool('eraser')" title="지우개">
+      <svg viewBox="0 0 24 24"><path d="M20 20H7L3 16l10-10 7 7-3.5 3.5"/><path d="m6.5 17.5 5-5"/></svg>
+      <span class="lbl">지우개</span>
+    </button>
+
+    <div class="bar-sep"></div>
+
+    <!-- 스티커 -->
+    <button class="bar-btn" id="btn-sticker" onclick="activateTool('sticker')" title="스티커">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+      <span class="lbl">스티커</span>
+    </button>
+
+    <!-- 사진 -->
+    <button class="bar-btn" onclick="addPhoto()" title="사진">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span class="lbl">사진</span>
+    </button>
+
+    <!-- 배경 -->
+    <button class="bar-btn" id="btn-bg" onclick="activateTool('bg')" title="배경">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18" stroke-width="1.2"/></svg>
+      <span class="lbl">배경</span>
+    </button>
+
+    <div class="bar-sep"></div>
+
+    <!-- 내보내기 -->
+    <button class="bar-btn" onclick="exportData()" title="내보내기">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span class="lbl">내보내기</span>
+    </button>
+
+    <!-- 가져오기 -->
+    <button class="bar-btn" onclick="importData()" title="가져오기">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="lbl">가져오기</span>
+    </button>
+
+    <!-- 저장 -->
+    <button class="bar-btn" onclick="saveEntry()" title="저장">
+      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      <span class="lbl">저장</span>
+    </button>
+  </div>
+
+  <!-- SUB PANEL: 그리기 (펜종류 + 색상 + 굵기) -->
+  <div class="sub-panel open" id="panel-draw">
+    <!-- pen chips -->
+    <div class="pen-chip active" data-pen="ballpoint" onclick="pickPen(this)">
+      <svg viewBox="0 0 16 16"><line x1="2" y1="14" x2="14" y2="2" stroke-width="1.5"/></svg>볼펜
+    </div>
+    <div class="pen-chip" data-pen="fountain" onclick="pickPen(this)">
+      <svg viewBox="0 0 16 16"><path d="M2 14 C5 10 9 4 14 2" stroke-width="2.5"/></svg>만년필
+    </div>
+    <div class="pen-chip" data-pen="pencil" onclick="pickPen(this)">
+      <svg viewBox="0 0 16 16"><line x1="2" y1="14" x2="14" y2="2" stroke-width="1.5" stroke-dasharray="2 1.5"/></svg>연필
+    </div>
+    <div class="pen-chip" data-pen="brush" onclick="pickPen(this)">
+      <svg viewBox="0 0 16 16"><path d="M2 14 C4 9 10 5 14 2" stroke-width="3.5"/></svg>붓펜
+    </div>
+    <div class="pen-chip" data-pen="marker" onclick="pickPen(this)">
+      <svg viewBox="0 0 16 16"><line x1="2" y1="10" x2="14" y2="6" stroke-width="5" stroke-linecap="square" opacity=".5"/></svg>형광펜
+    </div>
+    <div style="width:1px;height:22px;background:var(--border);flex-shrink:0;margin:0 2px;"></div>
+    <!-- colors -->
+    <div class="cdot sel" style="background:#1a1a1a" data-color="#1a1a1a" onclick="pickColor(this)"></div>
+    <div class="cdot" style="background:#c17b4a" data-color="#c17b4a" onclick="pickColor(this)"></div>
+    <div class="cdot" style="background:#e63946" data-color="#e63946" onclick="pickColor(this)"></div>
+    <div class="cdot" style="background:#2d6a4f" data-color="#2d6a4f" onclick="pickColor(this)"></div>
+    <div class="cdot" style="background:#457b9d" data-color="#457b9d" onclick="pickColor(this)"></div>
+    <div class="cdot" style="background:#7b2d8b" data-color="#7b2d8b" onclick="pickColor(this)"></div>
+    <div class="cdot" style="background:#f4a261" data-color="#f4a261" onclick="pickColor(this)"></div>
+    <div class="cdot" style="background:#aaa" data-color="#aaaaaa" onclick="pickColor(this)"></div>
+    <div class="cdot" style="background:#fff;border-color:#ccc!important" data-color="#ffffff" onclick="pickColor(this)"></div>
+    <input type="color" id="custom-color" style="width:26px;height:26px;border-radius:50%;border:2px solid var(--border);cursor:pointer;flex-shrink:0;padding:0" value="#c17b4a" oninput="penColor=this.value;document.querySelectorAll('.cdot').forEach(d=>d.classList.remove('sel'))">
+    <div style="width:1px;height:22px;background:var(--border);flex-shrink:0;margin:0 2px;"></div>
+    <!-- size -->
+    <span style="font-size:11px;color:var(--muted);flex-shrink:0">굵기</span>
+    <input type="range" class="sz-slider" min="1" max="24" value="3" oninput="penSize=+this.value;document.getElementById('sv').textContent=this.value">
+    <span id="sv" style="font-size:11px;color:var(--muted);min-width:14px;flex-shrink:0">3</span>
+  </div>
+
+  <!-- SUB PANEL: 타이핑 (폰트 크기 + 색) -->
+  <div class="sub-panel" id="panel-text">
+    <span style="font-size:11px;color:var(--muted);flex-shrink:0">크기</span>
+    <button class="txt-size-btn" onclick="txtSize=Math.max(10,txtSize-2);updateTxtSize()">−</button>
+    <span id="txt-size-lbl" style="font-size:12px;min-width:24px;text-align:center">16</span>
+    <button class="txt-size-btn" onclick="txtSize=Math.min(60,txtSize+2);updateTxtSize()">+</button>
+    <div style="width:1px;height:22px;background:var(--border);flex-shrink:0;margin:0 4px;"></div>
+    <div class="cdot sel" style="background:#1a1a1a" data-color="#1a1a1a" onclick="pickTxtColor(this)"></div>
+    <div class="cdot" style="background:#c17b4a" data-color="#c17b4a" onclick="pickTxtColor(this)"></div>
+    <div class="cdot" style="background:#e63946" data-color="#e63946" onclick="pickTxtColor(this)"></div>
+    <div class="cdot" style="background:#2d6a4f" data-color="#2d6a4f" onclick="pickTxtColor(this)"></div>
+    <div class="cdot" style="background:#457b9d" data-color="#457b9d" onclick="pickTxtColor(this)"></div>
+    <div class="cdot" style="background:#7b2d8b" data-color="#7b2d8b" onclick="pickTxtColor(this)"></div>
+    <div class="cdot" style="background:#f4a261" data-color="#f4a261" onclick="pickTxtColor(this)"></div>
+    <div class="cdot" style="background:#aaa" data-color="#aaaaaa" onclick="pickTxtColor(this)"></div>
+    <input type="color" style="width:26px;height:26px;border-radius:50%;border:2px solid var(--border);cursor:pointer;flex-shrink:0;padding:0" value="#1a1a1a" oninput="txtColor=this.value">
+    <div style="width:1px;height:22px;background:var(--border);flex-shrink:0;margin:0 4px;"></div>
+    <span style="font-size:11px;color:var(--muted);flex-shrink:0">탭해서 텍스트 박스 추가</span>
+  </div>
+
+  <!-- SUB PANEL: 배경 (패턴 + 색상) -->
+  <div class="bg-section" id="panel-bg">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span class="bg-row-label">패턴</span>
+      <div class="bg-chips">
+        <button class="bg-chip" data-pat="bgp-plain" onclick="setPat(this)">무지</button>
+        <button class="bg-chip active" data-pat="bgp-lined" onclick="setPat(this)">줄</button>
+        <button class="bg-chip" data-pat="bgp-grid" onclick="setPat(this)">모눈</button>
+        <button class="bg-chip" data-pat="bgp-dot" onclick="setPat(this)">점선</button>
+      </div>
+      <span class="bg-row-label" style="margin-left:6px">색상</span>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;overflow-x:auto;">
+        <div class="bg-color-swatch sel" style="background:#fffef8" data-bgc="#fffef8" onclick="setBgColor(this)" title="아이보리"></div>
+        <div class="bg-color-swatch" style="background:#e8d5b0" data-bgc="#e8d5b0" onclick="setBgColor(this)" title="크래프트"></div>
+        <div class="bg-color-swatch" style="background:#e8f0fe" data-bgc="#e8f0fe" onclick="setBgColor(this)" title="라이트블루"></div>
+        <div class="bg-color-swatch" style="background:#fce4ec" data-bgc="#fce4ec" onclick="setBgColor(this)" title="핑크"></div>
+        <div class="bg-color-swatch" style="background:#e8f5e9" data-bgc="#e8f5e9" onclick="setBgColor(this)" title="민트"></div>
+        <div class="bg-color-swatch" style="background:#fff9c4" data-bgc="#fff9c4" onclick="setBgColor(this)" title="옐로우"></div>
+        <div class="bg-color-swatch" style="background:#f3e5f5" data-bgc="#f3e5f5" onclick="setBgColor(this)" title="라벤더"></div>
+        <div class="bg-color-swatch" style="background:#1e1e2e" data-bgc="#1e1e2e" onclick="setBgColor(this)" title="다크"></div>
+        <input type="color" style="width:28px;height:28px;border-radius:8px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;padding:0" value="#fffef8" oninput="applyBgColor(this.value);document.querySelectorAll('.bg-color-swatch').forEach(s=>s.classList.remove('sel'))">
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap" id="canvas-wrap">
+    <canvas id="draw-canvas"></canvas>
+    <div id="overlay-layer"></div>
+    <!-- sticker picker -->
+    <div class="picker-overlay" id="sticker-picker">
+      <div class="picker-title">🌸 탭해서 추가 · 드래그 이동 · 더블탭 삭제 · 모서리 크기조절</div>
+      <div class="s-grid" id="s-grid"></div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhoto(event)">
+<input type="file" id="import-input" accept=".json" style="display:none" onchange="handleImport(event)">
+<div class="toast" id="toast"></div>
+
+<script>
+const STICKERS=['🌸','🌺','🌻','🌹','🌷','🍀','🦋','🐝','⭐','🌟','✨','💫','🎀','🎁','🎈','🎉','☁️','🌈','🌙','☀️','❄️','🔥','💧','🌊','🍓','🍑','🍋','🍩','☕','🧋','🐱','🐶','🐰','🦊','🐻','🐼','🧸','🪄','💌','📝','🎵','🎶','💕','💖','💝','🫧','🪷','🌿','🍃','🌼','🍁'];
+
+let year,month,today,currentKey='';
+let penType='ballpoint',penColor='#1a1a1a',penSize=3;
+let txtColor='#1a1a1a',txtSize=16;
+let isDrawing=false,lastX=0,lastY=0,pressure=0.5;
+let points=[];
+let entries={};
+let currentPat='bgp-lined',currentBgColor='#fffef8';
+let activeTool='draw';
+
+const calView=document.getElementById('cal-view');
+const diaryView=document.getElementById('diary-view');
+const canvas=document.getElementById('draw-canvas');
+const ctx=canvas.getContext('2d');
+const overlay=document.getElementById('overlay-layer');
+const wrap=document.getElementById('canvas-wrap');
+
+function init(){
+  const d=new Date();today={y:d.getFullYear(),m:d.getMonth(),d:d.getDate()};
+  year=today.y;month=today.m;
+  try{entries=JSON.parse(localStorage.getItem('diary_v3')||'{}');}catch(e){entries={};}
+  renderCal();buildStickers();
+}
+function k(y,m,d){return`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+function db(){try{localStorage.setItem('diary_v3',JSON.stringify(entries));}catch(e){}}
+
+/* ── CALENDAR ── */
+function renderCal(){
+  document.getElementById('cal-title').textContent=`${year}년 ${month+1}월`;
+  const grid=document.getElementById('days-grid');grid.innerHTML='';
+  const start=new Date(year,month,1).getDay();
+  const total=new Date(year,month+1,0).getDate();
+  for(let i=0;i<start;i++){const e=document.createElement('div');e.className='day-cell empty';grid.appendChild(e);}
+  for(let d=1;d<=total;d++){
+    const el=document.createElement('div');
+    const dow=(start+d-1)%7;
+    let cls='day-cell';
+    if(dow===0)cls+=' sun';if(dow===6)cls+=' sat';
+    if(year===today.y&&month===today.m&&d===today.d)cls+=' today';
+    el.className=cls;el.innerHTML=`<div class="day-num">${d}</div>`;
+    const entry=entries[k(year,month,d)];
+    if(entry&&entry.thumb){const img=document.createElement('img');img.className='day-thumb';img.src=entry.thumb;img.alt='';el.appendChild(img);}
+    else if(entry){const dot=document.createElement('div');dot.className='day-dot';el.appendChild(dot);}
+    el.addEventListener('click',()=>openDiary(year,month,d));
+    grid.appendChild(el);
+  }
+}
+function changeMonth(dir){month+=dir;if(month<0){month=11;year--;}if(month>11){month=0;year++;}renderCal();}
+
+/* ── OPEN DIARY ── */
+function openDiary(y,m,d){
+  currentKey=k(y,m,d);
+  const days=['일','월','화','수','목','금','토'];
+  document.getElementById('bar-date').textContent=`${y}.${m+1}.${d} ${days[new Date(y,m,d).getDay()]}`;
+  calView.style.display='none';diaryView.style.display='flex';
+  overlay.innerHTML='';
+  document.getElementById('sticker-picker').classList.remove('open');
+  const entry=entries[currentKey];
+  const pat=(entry&&entry.pat)||'bgp-lined';
+  const bgc=(entry&&entry.bgc)||'#fffef8';
+  currentPat=pat;currentBgColor=bgc;
+  applyBgPattern(pat);applyBgColor(bgc);
+  document.querySelectorAll('.bg-chip').forEach(b=>b.classList.toggle('active',b.dataset.pat===pat));
+  document.querySelectorAll('.bg-color-swatch').forEach(s=>s.classList.toggle('sel',s.dataset.bgc===bgc));
+  activateTool('draw');
+  setTimeout(()=>{resizeCvs();loadCanvas();},60);
+}
+function goBack(){diaryView.style.display='none';calView.style.display='flex';renderCal();}
+
+function resizeCvs(){
+  const w=wrap.clientWidth,h=wrap.clientHeight;
+  const tmp=document.createElement('canvas');tmp.width=canvas.width;tmp.height=canvas.height;
+  tmp.getContext('2d').drawImage(canvas,0,0);
+  canvas.width=w;canvas.height=h;ctx.lineCap='round';ctx.lineJoin='round';ctx.drawImage(tmp,0,0);
+}
+
+function loadCanvas(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);overlay.innerHTML='';
+  const entry=entries[currentKey];if(!entry)return;
+  if(entry.drawing){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0);img.src=entry.drawing;}
+  if(entry.items)entry.items.forEach(it=>{
+    if(it.type==='txt')placeTxtBox(it.x,it.y,it.w,it.h,it.text,it.size,it.color,false);
+    else placeItem(it.type,it.src,it.x,it.y,it.w,it.h,false);
+  });
+}
+
+/* ── SAVE ── */
+function saveEntry(){
+  const items=[];
+  overlay.querySelectorAll('.placed-item,.txt-box').forEach(el=>{
+    if(el.classList.contains('txt-box')){
+      const ta=el.querySelector('textarea');
+      items.push({type:'txt',x:parseInt(el.style.left),y:parseInt(el.style.top),w:parseInt(el.style.width),h:parseInt(el.style.height),text:ta.value,size:parseInt(ta.style.fontSize),color:ta.style.color});
+    }else{
+      items.push({type:el.dataset.type,src:el.dataset.src,x:parseInt(el.style.left),y:parseInt(el.style.top),w:parseInt(el.style.width),h:parseInt(el.style.height)});
+    }
+  });
+  const drawing=canvas.toDataURL('image/png');
+  const thumb=makeThumb(drawing,items);
+  entries[currentKey]={drawing,items,pat:currentPat,bgc:currentBgColor,thumb};
+  db();showToast('저장됐어요 ✓');
+}
+
+function makeThumb(drawing,items){
+  const tw=120,th=90,tc=document.createElement('canvas');tc.width=tw;tc.height=th;
+  const tx=tc.getContext('2d');tx.fillStyle=currentBgColor;tx.fillRect(0,0,tw,th);
+  const sx=tw/canvas.width,sy=th/canvas.height;
+  const img=new Image();img.src=drawing;tx.drawImage(img,0,0,tw,th);
+  items.forEach(it=>{
+    if(it.type==='photo'){const pi=new Image();pi.src=it.src;tx.drawImage(pi,it.x*sx,it.y*sy,it.w*sx,it.h*sy);}
+    else if(it.type==='sticker'){tx.font=`${Math.round(it.h*sy)}px serif`;tx.fillText(it.src,it.x*sx,it.y*sy+it.h*sy*.85);}
+    else if(it.type==='txt'){tx.font=`${Math.round((it.size||16)*sy)}px sans-serif`;tx.fillStyle=it.color||'#1a1a1a';tx.fillText(it.text.split('\n')[0],it.x*sx,it.y*sy+14*sy);}
+  });
+  return tc.toDataURL('image/png');
+}
+
+function clearCanvas(){
+  if(!confirm('이 날의 일기를 모두 지울까요?'))return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);overlay.innerHTML='';
+  delete entries[currentKey];db();
+}
+
+/* ── TOOL ACTIVATION ── */
+const toolPanels={draw:'panel-draw',text:'panel-text',bg:'panel-bg',eraser:null,sticker:null};
+const toolBtns={draw:'btn-draw',text:'btn-text',eraser:'btn-erase',sticker:'btn-sticker',bg:'btn-bg'};
+function activateTool(t){
+  activeTool=t;
+  // update button states
+  Object.keys(toolBtns).forEach(id=>{
+    const btn=document.getElementById(toolBtns[id]);
+    if(btn)btn.classList.toggle('active',id===t);
+  });
+  // hide all sub panels
+  document.querySelectorAll('.sub-panel').forEach(p=>p.classList.remove('open'));
+  document.getElementById('panel-bg').classList.remove('open');
+  document.getElementById('sticker-picker').classList.remove('open');
+  // show relevant
+  if(t==='draw'){document.getElementById('panel-draw').classList.add('open');canvas.style.cursor='crosshair';}
+  else if(t==='text'){document.getElementById('panel-text').classList.add('open');canvas.style.cursor='text';}
+  else if(t==='eraser'){document.getElementById('panel-draw').classList.add('open');canvas.style.cursor='cell';penType='eraser';}
+  else if(t==='sticker'){document.getElementById('sticker-picker').classList.add('open');}
+  else if(t==='bg'){document.getElementById('panel-bg').classList.add('open');}
+  if(t!=='eraser'&&penType==='eraser')penType='ballpoint';
+}
+
+/* ── DRAWING ── */
+function getPos(e){
+  const r=canvas.getBoundingClientRect();const sx=canvas.width/r.width,sy=canvas.height/r.height;
+  if(e.touches){const t=e.touches[0];pressure=t.force>0?t.force:0.5;return{x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sy};}
+  pressure=e.pressure>0?e.pressure:0.5;return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};
+}
+
+canvas.addEventListener('pointerdown',e=>{
+  if(activeTool==='text'){e.preventDefault();addTxtBox(e);return;}
+  if(activeTool!=='draw'&&activeTool!=='eraser')return;
+  e.preventDefault();isDrawing=true;
+  const p=getPos(e);lastX=p.x;lastY=p.y;
+  points=[{x:p.x,y:p.y,p:pressure}];
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!isDrawing)return;e.preventDefault();
+  const p=getPos(e);
+  points.push({x:p.x,y:p.y,p:Math.max(0.3,Math.min(1,pressure))});
+  // 최소 2점 있어야 그리기
+  if(points.length<2)return;
+  const et=activeTool==='eraser'?'eraser':penType;
+  const cur=points[points.length-1];
+  const prev=points[points.length-2];
+  const pr=cur.p;
+  ctx.lineCap='round';ctx.lineJoin='round';
+  if(et==='eraser'){
+    ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;ctx.lineWidth=penSize*7;
+    ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(cur.x,cur.y);ctx.stroke();
+  } else {
+    ctx.globalCompositeOperation='source-over';ctx.strokeStyle=penColor;
+    let lw=penSize;
+    if(et==='ballpoint'){lw=penSize*(.6+pr*.7);ctx.globalAlpha=.92;}
+    else if(et==='fountain'){lw=penSize*(.4+pr*1.4);ctx.globalAlpha=.95;}
+    else if(et==='pencil'){lw=penSize*(.5+pr*.6);ctx.globalAlpha=.38+pr*.45;}
+    else if(et==='brush'){lw=penSize*(.3+pr*2.2);ctx.globalAlpha=.88;}
+    else if(et==='marker'){lw=penSize*3.5;ctx.globalAlpha=.32;ctx.lineCap='square';}
+    ctx.lineWidth=lw;
+    // 베지어 곡선으로 부드럽게
+    if(points.length>=3){
+      const p0=points[points.length-3];
+      const p1=points[points.length-2];
+      const p2=points[points.length-1];
+      const cpx=(p0.x+p2.x)/2;
+      const cpy=(p0.y+p2.y)/2;
+      ctx.beginPath();ctx.moveTo(p0.x,p0.y);
+      ctx.quadraticCurveTo(p1.x,p1.y,cpx,cpy);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(cur.x,cur.y);ctx.stroke();
+    }
+  }
+  lastX=cur.x;lastY=cur.y;
+});
+const endD=()=>{
+  if(isDrawing&&points.length>=2){
+    // 마지막 점까지 마무리
+    const last=points[points.length-1];
+    const prev=points[points.length-2];
+    ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(last.x,last.y);ctx.stroke();
+  }
+  isDrawing=false;points=[];
+  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+};
+canvas.addEventListener('pointerup',endD);canvas.addEventListener('pointercancel',endD);
+canvas.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+canvas.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+
+function pickPen(el){
+  document.querySelectorAll('.pen-chip').forEach(o=>o.classList.remove('active'));el.classList.add('active');
+  penType=el.dataset.pen;activeTool='draw';
+}
+function pickColor(el){
+  document.querySelectorAll('#panel-draw .cdot').forEach(d=>d.classList.remove('sel'));el.classList.add('sel');penColor=el.dataset.color;
+}
+function pickTxtColor(el){
+  document.querySelectorAll('#panel-text .cdot').forEach(d=>d.classList.remove('sel'));el.classList.add('sel');txtColor=el.dataset.color;
+  overlay.querySelectorAll('.txt-box textarea').forEach(ta=>{if(document.activeElement===ta)ta.style.color=txtColor;});
+}
+function updateTxtSize(){document.getElementById('txt-size-lbl').textContent=txtSize;}
+
+/* ── TEXT BOXES ── */
+function addTxtBox(e){
+  const r=canvas.getBoundingClientRect();
+  const x=e.clientX-r.left,y=e.clientY-r.top;
+  placeTxtBox(x,y,180,80,'',txtSize,txtColor,true);
+}
+function placeTxtBox(x,y,w,h,text,size,color,focus){
+  const box=document.createElement('div');box.className='txt-box';
+  box.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px;`;
+  const ta=document.createElement('textarea');
+  ta.style.cssText=`font-size:${size||16}px;color:${color||'#1a1a1a'};width:100%;height:100%;background:transparent;border:1.5px dashed rgba(193,123,74,.45);border-radius:4px;resize:none;outline:none;padding:4px 6px;font-family:inherit;line-height:1.6;`;
+  ta.value=text||'';
+  ta.addEventListener('focus',()=>{txtSize=parseInt(ta.style.fontSize);txtColor=ta.style.color;});
+  ta.addEventListener('input',()=>{ta.style.fontSize=txtSize+'px';ta.style.color=txtColor;});
+  box.appendChild(ta);
+  const rz=document.createElement('div');rz.className='txt-box-handle';
+  rz.addEventListener('pointerdown',ev=>startResize(box,rz,ev,true));
+  box.appendChild(rz);
+  makeDrag(box,'.txt-box-handle');
+  overlay.appendChild(box);
+  box.addEventListener('dblclick',e=>{if(e.target===rz)return;if(confirm('텍스트 박스를 삭제할까요?'))box.remove();});
+  if(focus)setTimeout(()=>ta.focus(),50);
+}
+
+/* ── STICKERS / PHOTOS ── */
+function buildStickers(){
+  const grid=document.getElementById('s-grid');
+  STICKERS.forEach(s=>{
+    const el=document.createElement('div');el.className='s-item';el.textContent=s;
+    el.addEventListener('click',()=>{
+      const x=60+Math.random()*(wrap.clientWidth-150);
+      const y=60+Math.random()*(wrap.clientHeight-200);
+      placeItem('sticker',s,x,y,56,56,true);
+    });
+    grid.appendChild(el);
+  });
+}
+function addPhoto(){document.getElementById('photo-input').click();}
+function handlePhoto(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const x=40+Math.random()*(wrap.clientWidth-260);
+    const y=40+Math.random()*(wrap.clientHeight-260);
+    placeItem('photo',ev.target.result,x,y,200,160,true);
+  };
+  reader.readAsDataURL(file);e.target.value='';
+}
+function placeItem(type,src,x,y,w,h,animate){
+  const el=document.createElement('div');el.className='placed-item';el.dataset.type=type;el.dataset.src=src;
+  el.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px;`;
+  if(type==='sticker'){el.style.fontSize=h+'px';el.style.lineHeight='1';el.textContent=src;}
+  else{
+    el.style.border='1.5px solid rgba(0,0,0,.12)';el.style.borderRadius='6px';el.style.overflow='hidden';
+    const img=document.createElement('img');img.src=src;img.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';el.appendChild(img);
+    const rz=document.createElement('div');rz.className='resize-handle';
+    rz.addEventListener('pointerdown',ev=>startResize(el,rz,ev,false));el.appendChild(rz);
+  }
+  if(animate){el.style.transform='scale(0)';el.style.transition='transform .2s cubic-bezier(.34,1.56,.64,1)';}
+  makeDrag(el,'.resize-handle');overlay.appendChild(el);
+  if(animate)setTimeout(()=>el.style.transform='scale(1)',10);
+  el.addEventListener('dblclick',()=>{if(confirm('삭제할까요?'))el.remove();});
+}
+function makeDrag(el,excludeSel){
+  let sx,sy,ox,oy;
+  el.addEventListener('pointerdown',e=>{
+    if(excludeSel&&e.target.matches(excludeSel))return;
+    if(e.target.tagName==='TEXTAREA')return;
+    e.stopPropagation();el.setPointerCapture(e.pointerId);
+    sx=e.clientX;sy=e.clientY;ox=parseInt(el.style.left);oy=parseInt(el.style.top);
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!(e.buttons&1))return;e.stopPropagation();
+    el.style.left=(ox+e.clientX-sx)+'px';el.style.top=(oy+e.clientY-sy)+'px';
+  });
+}
+function startResize(el,rz,e,isTxt){
+  e.stopPropagation();rz.setPointerCapture(e.pointerId);
+  const sw=parseInt(el.style.width),sh=parseInt(el.style.height),sx=e.clientX,sy=e.clientY;
+  const mv=ev=>{
+    el.style.width=Math.max(50,sw+ev.clientX-sx)+'px';
+    el.style.height=Math.max(40,sh+ev.clientY-sy)+'px';
+    if(!isTxt&&el.dataset.type==='sticker')el.style.fontSize=parseInt(el.style.height)+'px';
+  };
+  const up=()=>{rz.removeEventListener('pointermove',mv);rz.removeEventListener('pointerup',up);};
+  rz.addEventListener('pointermove',mv);rz.addEventListener('pointerup',up);
+}
+
+/* ── BACKGROUND ── */
+const allPats=['bgp-plain','bgp-lined','bgp-grid','bgp-dot'];
+function applyBgPattern(pat){allPats.forEach(c=>canvas.classList.remove(c));canvas.classList.add(pat);currentPat=pat;}
+function applyBgColor(c){canvas.style.backgroundColor=c;currentBgColor=c;}
+function setPat(el){document.querySelectorAll('.bg-chip').forEach(b=>b.classList.remove('active'));el.classList.add('active');applyBgPattern(el.dataset.pat);}
+function setBgColor(el){document.querySelectorAll('.bg-color-swatch').forEach(s=>s.classList.remove('sel'));el.classList.add('sel');applyBgColor(el.dataset.bgc);}
+
+/* ── EXPORT / IMPORT (갤럭시 연동) ── */
+function exportData(){
+  const blob=new Blob([JSON.stringify(entries)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  const d=new Date();a.download=`diary_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+  a.click();URL.revokeObjectURL(url);
+  showToast('내보내기 완료! 갤럭시로 보내서 가져오기 하세요 📤');
+}
+function importData(){document.getElementById('import-input').click();}
+function handleImport(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const imported=JSON.parse(ev.target.result);
+      const merged=Object.assign({},entries,imported);
+      entries=merged;db();renderCal();
+      showToast(`가져오기 완료! ${Object.keys(imported).length}개 날짜 불러옴 📥`);
+    }catch(err){showToast('파일을 읽을 수 없어요 😢');}
+  };
+  reader.readAsText(file);e.target.value='';
+}
+
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+window.addEventListener('resize',()=>{if(diaryView.style.display==='flex')resizeCvs();});
+init();
+</script>
+</body>
+</html>
